@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Hide and Seek</title>
+  <link rel="stylesheet" type="text/css" href="styles.css">
+  <!-- Firebase JS SDK (non-module version) -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+</head>
+<body>
+  <div class="stats-box" id="stats-box">Point your phone to see player stats</div>
+  <div class="auth-box" id="auth-box">
+    <input type="text" id="player-name" placeholder="Enter Your Name">
+    <input type="text" id="room-code" placeholder="Enter Room Code">
+    <button onclick="joinRoom()">Join Room</button>
+    <button onclick="createRoom()">Create Room</button>
+    <p id="room-message" style="color: red;"></p>
+  </div>
+  <script src="scripts.js"></script>
+</body>
+</html>
