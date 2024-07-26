@@ -18,7 +18,9 @@ var firebaseConfig = {
   let playerId = null;
   let currentRoom = null;
   let playerName = null;
+  let playerRole = null;
   let userPosition = { lat: 0, lng: 0 };
+  let playerInfoDivs = {};
   
   // Update Position
   function updatePosition(position) {
@@ -33,10 +35,10 @@ var firebaseConfig = {
       lng: lng,
       speed: position.coords.speed || 0,
       direction: position.coords.heading || 0,
-      role: 'hider',
+      role: playerRole,
       name: playerName
     };
-    
+  
     database.ref('rooms/' + currentRoom + '/players/' + playerId).set(playerData);
   }
   
@@ -65,6 +67,7 @@ var firebaseConfig = {
   
     playerName = name;
     currentRoom = roomCode;
+    playerRole = document.querySelector('input[name="role"]:checked').value;
   
     database.ref('rooms/' + roomCode).once('value').then((snapshot) => {
       if (snapshot.exists()) {
@@ -75,7 +78,8 @@ var firebaseConfig = {
           lng: 0,
           speed: 0,
           direction: 0,
-          role: 'hider'
+          role: playerRole,
+          catches: 0
         });
   
         // Check for existing players
@@ -93,6 +97,7 @@ var firebaseConfig = {
           document.getElementById('auth-box').style.display = 'none';
           document.getElementById('stats-box').style.display = 'block';
           startGeolocation();
+          updateLeaderboard();
         });
       } else {
         document.getElementById('room-message').innerText = "Room not found.";
@@ -111,9 +116,10 @@ var firebaseConfig = {
     }
   
     playerName = name;
+    playerRole = document.querySelector('input[name="role"]:checked').value;
     const roomCode = Math.floor(10000 + Math.random() * 90000).toString();
     currentRoom = roomCode;
-    
+  
     database.ref('rooms/' + roomCode).set({
       createdAt: firebase.database.ServerValue.TIMESTAMP
     }).then(() => {
@@ -124,70 +130,144 @@ var firebaseConfig = {
         lng: 0,
         speed: 0,
         direction: 0,
-        role: 'host'
+        role: playerRole,
+        catches: 0
       });
   
       document.getElementById('auth-box').style.display = 'none';
       document.getElementById('stats-box').style.display = 'block';
       startGeolocation();
       alert("Room created! Share this code with your friends: " + roomCode);
+      updateLeaderboard();
     }).catch(error => {
       document.getElementById('room-message').innerText = "Error: " + error.message;
     });
   }
   
-  // Handle Gyro Data
-  window.addEventListener('deviceorientation', (event) => {
-    const infoBox = document.getElementById('stats-box');
-    const playerDistances = [];
+  // Leave Game
+  function leaveGame() {
+    if (!currentRoom || !playerId) return;
   
-    database.ref('rooms/' + currentRoom + '/players').once('value').then((snapshot) => {
-      const players = snapshot.val();
-      for (const id in players) {
-        const player = players[id];
-        const distance = getDistance(userPosition.lat, userPosition.lng, player.lat, player.lng);
-        playerDistances.push({
-          id: id,
-          distance: distance,
-          player: player
-        });
-      }
-  
-      // Sort by distance
-      playerDistances.sort((a, b) => a.distance - b.distance);
-      const closestPlayer = playerDistances[0];
-  
-      if (closestPlayer) {
-        infoBox.innerHTML = `
-          Player: ${closestPlayer.player.name} <br>
-          Speed: ${closestPlayer.player.speed} m/s <br>
-          Direction: ${closestPlayer.player.direction}° <br>
-          Distance: ${(closestPlayer.distance).toFixed(2)} feet <br>
-          Role: ${closestPlayer.player.role}
-        `;
-      } else {
-        infoBox.innerHTML = 'No players in range';
-      }
-    }).catch(error => {
-      infoBox.innerHTML = 'Error: ' + error.message;
+    database.ref('rooms/' + currentRoom + '/players/' + playerId).remove().then(() => {
+      document.getElementById('auth-box').style.display = 'block';
+      document.getElementById('stats-box').style.display = 'none';
+      document.getElementById('leaderboard-content').innerHTML = '';
+      playerMarkers = {};
+      currentRoom = null;
+      playerId = null;
+      playerName = null;
+      playerRole = null;
+      userPosition = { lat: 0, lng: 0 };
+      playerInfoDivs = {};
     });
+  }
+  
+  // Update Leaderboard
+  function updateLeaderboard() {
+    if (!currentRoom) return;
+  
+    database.ref('rooms/' + currentRoom + '/players').on('value', (snapshot) => {
+      const players = snapshot.val();
+      const leaderboardContent = document.getElementById('leaderboard-content');
+      leaderboardContent.innerHTML = '';
+  
+      if (players) {
+        const seekers = [];
+        const hiders = [];
+  
+        for (const id in players) {
+          if (players[id].role === 'seeker') {
+            seekers.push(players[id]);
+          } else {
+            hiders.push(players[id]);
+          }
+        }
+  
+        seekers.sort((a, b) => b.catches - a.catches);
+  
+        const seekerList = seekers.map(player => `<p>${player.name} (Seeker) - Catches: ${player.catches}</p>`).join('');
+        const hiderList = hiders.map(player => `<p>${player.name} (Hider)</p>`).join('');
+  
+        leaderboardContent.innerHTML = `<h3>Seekers</h3>${seekerList}<h3>Hiders</h3>${hiderList}`;
+      }
+    });
+  }
+  
+  // Toggle Leaderboard
+  function toggleLeaderboard() {
+    const leaderboardContent = document.getElementById('leaderboard-content');
+    leaderboardContent.style.display = leaderboardContent.style.display === 'none' ? 'block' : 'none';
+  }
+  
+  // Initialize Event Listeners
+  function initEventListeners() {
+    window.addEventListener('deviceorientation', handleOrientation);
+  }
+  
+  function handleOrientation(event) {
+    const alpha = event.alpha; // Compass direction
+    const beta = event.beta;
+    const gamma = event.gamma;
+  
+    // Update UI based on orientation
+  }
+  
+  // Start Event Listeners
+  initEventListeners();
+  
+  // Watch Player Position
+  database.ref('rooms/' + currentRoom + '/players').on('value', (snapshot) => {
+    const players = snapshot.val();
+    if (players) {
+      for (const id in players) {
+        if (id !== playerId) {
+          const player = players[id];
+          const distance = calculateDistance(userPosition.lat, userPosition.lng, player.lat, player.lng);
+  
+          if (distance <= 1 && playerRole === 'seeker' && player.role === 'hider') {
+            // Auto-tagging within 1 foot
+            database.ref('rooms/' + currentRoom + '/players/' + id + '/role').set('seeker');
+            database.ref('rooms/' + currentRoom + '/players/' + playerId + '/catches').transaction(catches => (catches || 0) + 1);
+            updateLeaderboard();
+          }
+  
+          if (!playerInfoDivs[id]) {
+            playerInfoDivs[id] = createPlayerInfoDiv(player);
+          }
+  
+          updatePlayerInfoDiv(playerInfoDivs[id], player, distance);
+        }
+      }
+    }
   });
   
-  // Calculate Distance
-  function getDistance(lat1, lon1, lat2, lon2) {
-    const R = 3958.8; // Radius of the Earth in miles
-    const dLat = degreesToRadians(lat2 - lat1);
-    const dLon = degreesToRadians(lon2 - lon1);
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(degreesToRadians(lat1)) * Math.cos(degreesToRadians(lat2)) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  function createPlayerInfoDiv(player) {
+    const div = document.createElement('div');
+    div.className = 'player-info';
+    div.style.color = player.role === 'seeker' ? 'red' : 'blue';
+    document.body.appendChild(div);
+    return div;
+  }
+  
+  function updatePlayerInfoDiv(div, player, distance) {
+    div.innerHTML = `<p>${player.name}</p><p>Distance: ${distance.toFixed(1)} ft</p><p>Speed: ${(player.speed || 0).toFixed(1)} ft/s</p>`;
+    div.style.display = 'block';
+    // Update position based on orientation
+  }
+  
+  function calculateDistance(lat1, lng1, lat2, lng2) {
+    const R = 6371e3; // metres
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lng2 - lng1) * Math.PI / 180;
+  
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distance = R * c * 5280; // Convert miles to feet
+  
+    const distance = R * c * 3.28084; // Convert to feet
     return distance;
-    }
-    
-    // Degrees to Radians
-    function degreesToRadians(degrees) {
-    return degrees * (Math.PI / 180);
-    }
+  }
   
