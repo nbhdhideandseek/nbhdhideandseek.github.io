@@ -1,5 +1,5 @@
-// Firebase Configuration
-const firebaseConfig = {
+// Initialize Firebase
+firebase.initializeApp({
     apiKey: "AIzaSyB6uVxF8NjNY4GpODW1h9Ha26zhhxs4Irw",
     authDomain: "nbhdhideandseek-9aa19.firebaseapp.com",
     databaseURL: "https://nbhdhideandseek-9aa19-default-rtdb.firebaseio.com",
@@ -7,122 +7,85 @@ const firebaseConfig = {
     storageBucket: "nbhdhideandseek-9aa19.appspot.com",
     messagingSenderId: "628281251970",
     appId: "1:628281251970:web:312b19439a29156353bc9b"
-};
+});
 
-// Initialize Firebase
-firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
-
-// Global Variables
 let playerId = null;
 let currentRoom = null;
-let playerRole = 'hider'; // Default role
 
 // Request Permissions
-function requestPermissions() {
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(startGeolocation, handleLocationError);
-    } else {
-        displayPopup("Geolocation is not supported by this browser.");
+async function requestPermissions() {
+    try {
+        await navigator.geolocation.getCurrentPosition(
+            () => {},
+            (error) => { console.error('Geolocation Error:', error); },
+            { enableHighAccuracy: true }
+        );
+
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        // Camera is accessed if this line is reached
+        stream.getTracks().forEach(track => track.stop()); // Stop the stream
+    } catch (error) {
+        console.error('Permission Error:', error);
     }
-}
-
-// Start Geolocation
-function startGeolocation(position) {
-    if (navigator.geolocation) {
-        navigator.geolocation.watchPosition(updatePosition, handleLocationError, {
-            enableHighAccuracy: true,
-            maximumAge: 10000,
-            timeout: 5000
-        });
-    }
-}
-
-// Update Position
-function updatePosition(position) {
-    if (playerId && currentRoom) {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        const speed = position.coords.speed || 0;
-        const direction = 0; // Use device orientation if needed
-
-        database.ref('rooms/' + currentRoom + '/players/' + playerId).update({
-            lat,
-            lng,
-            speed,
-            direction
-        });
-
-        checkProximity();
-    }
-}
-
-// Handle Location Error
-function handleLocationError(error) {
-    console.error("Geolocation error: " + error.message);
 }
 
 // Create Room
 function createRoom() {
-    const playerName = document.getElementById('player-name').value;
-    playerRole = document.querySelector('input[name="role"]:checked').value;
+    const roomName = prompt('Enter room name:');
+    if (!roomName) return;
 
-    playerId = `player_${Math.floor(Math.random() * 10000)}`;
-    currentRoom = `room_${Math.floor(Math.random() * 10000)}`;
+    database.ref('rooms').push({
+        name: roomName,
+        players: {}
+    }).then((roomRef) => {
+        currentRoom = roomRef.key;
+        playerId = database.ref('rooms/' + currentRoom + '/players').push().key;
+        const playerName = prompt('Enter your name:');
+        const role = prompt('Are you a hider or seeker? (hider/seeker)');
 
-    database.ref('rooms/' + currentRoom).set({
-        players: {
-            [playerId]: {
-                name: playerName,
-                lat: 0,
-                lng: 0,
-                speed: 0,
-                direction: 0,
-                role: playerRole,
-                catches: 0
-            }
-        }
-    }).then(() => {
-        document.getElementById('auth-box').style.display = 'none';
-        document.getElementById('game-area').style.display = 'block';
-        document.getElementById('leaderboard').style.display = 'block';
-        document.getElementById('leave-game-button').style.display = 'block';
-        requestPermissions();
-        updateLeaderboard();
-        displayPopup(`Room created! Your room code is ${currentRoom}.`);
-    }).catch(error => {
-        document.getElementById('room-message').innerText = "Error: " + error.message;
-    });
+        database.ref('rooms/' + currentRoom + '/players/' + playerId).set({
+            name: playerName,
+            role: role,
+            catches: 0,
+            closeCalls: 0,
+            lat: 0,
+            lng: 0,
+            speed: 0
+        });
+
+        displayPopup(`Room created! Share this code with your friends: ${currentRoom}`);
+    }).catch(error => console.error('Error creating room:', error));
 }
 
 // Join Room
 function joinRoom() {
-    const roomCode = document.getElementById('room-code').value;
-    const playerName = document.getElementById('player-name').value;
-    playerRole = document.querySelector('input[name="role"]:checked').value;
+    const roomCode = prompt('Enter room code:');
+    if (!roomCode) return;
 
-    playerId = `player_${Math.floor(Math.random() * 10000)}`;
-    currentRoom = roomCode;
+    database.ref('rooms/' + roomCode).once('value').then(snapshot => {
+        if (!snapshot.exists()) {
+            alert('Room not found!');
+            return;
+        }
 
-    database.ref('rooms/' + currentRoom + '/players/' + playerId).set({
-        name: playerName,
-        lat: 0,
-        lng: 0,
-        speed: 0,
-        direction: 0,
-        role: playerRole,
-        catches: 0
-    }).then(() => {
-        document.getElementById('auth-box').style.display = 'none';
-        document.getElementById('game-area').style.display = 'block';
-        document.getElementById('leaderboard').style.display = 'block';
-        document.getElementById('leave-game-button').style.display = 'block';
-        requestPermissions();
-        updateLeaderboard();
-        displayPopup(`Joined room ${currentRoom}.`);
-    }).catch(error => {
-        document.getElementById('room-message').innerText = "Error: " + error.message;
-    });
+        currentRoom = roomCode;
+        playerId = database.ref('rooms/' + currentRoom + '/players').push().key;
+        const playerName = prompt('Enter your name:');
+        const role = prompt('Are you a hider or seeker? (hider/seeker)');
+
+        database.ref('rooms/' + currentRoom + '/players/' + playerId).set({
+            name: playerName,
+            role: role,
+            catches: 0,
+            closeCalls: 0,
+            lat: 0,
+            lng: 0,
+            speed: 0
+        });
+
+        displayPopup('Joined the room!');
+    }).catch(error => console.error('Error joining room:', error));
 }
 
 // Leave Game
@@ -130,27 +93,11 @@ function leaveGame() {
     if (!playerId || !currentRoom) return;
 
     database.ref('rooms/' + currentRoom + '/players/' + playerId).remove().then(() => {
-        database.ref('rooms/' + currentRoom + '/players').once('value').then(snapshot => {
-            let activeSeekers = 0;
-            snapshot.forEach(playerSnapshot => {
-                const player = playerSnapshot.val();
-                if (player.role === 'seeker') {
-                    activeSeekers++;
-                }
-            });
-            if (activeSeekers === 0) {
-                database.ref('rooms/' + currentRoom).remove();
-            }
-        });
-        document.getElementById('auth-box').style.display = 'block';
-        document.getElementById('game-area').style.display = 'none';
-        document.getElementById('leaderboard').style.display = 'none';
-        document.getElementById('leave-game-button').style.display = 'none';
+        displayPopup('You have left the room.');
         currentRoom = null;
         playerId = null;
-    }).catch(error => {
-        displayPopup("Error leaving game: " + error.message);
-    });
+        document.getElementById('leaderboard').style.display = 'none';
+    }).catch(error => console.error('Error leaving room:', error));
 }
 
 // Toggle Leaderboard
@@ -174,7 +121,7 @@ function updateLeaderboard() {
             const playerElement = document.createElement('div');
             playerElement.classList.add('player');
             playerElement.classList.add(player.role);
-            playerElement.innerHTML = `${player.name} (${player.role}) - Caught: ${player.catches}`;
+            playerElement.innerHTML = `${player.name} (${player.role}) - ${player.role === 'seeker' ? 'Caught: ' + player.catches : 'Close Calls: ' + player.closeCalls}`;
             if (player.role === 'seeker') {
                 seekers.push(playerElement);
             } else {
@@ -182,10 +129,14 @@ function updateLeaderboard() {
             }
         });
 
-        seekers.sort((a, b) => b.innerText.split(':')[1] - a.innerText.split(':')[1]);
+        seekers.sort((a, b) => {
+            const aCatches = parseInt(a.innerText.split(': ')[1]);
+            const bCatches = parseInt(b.innerText.split(': ')[1]);
+            return bCatches - aCatches;
+        });
         seekers.forEach(seeker => leaderboard.appendChild(seeker));
         hiders.forEach(hider => leaderboard.appendChild(hider));
-    });
+    }).catch(error => console.error('Error updating leaderboard:', error));
 }
 
 // Update AR
@@ -214,13 +165,20 @@ function checkProximity() {
                     });
                     // Notify the players
                     displayPopup(`${otherPlayerData.name} has been caught and is now a seeker.`);
+                } else if (distance < 5 && distance >= 1) {
+                    // Update close calls for hiders
+                    if (currentPlayerData.role === 'hider') {
+                        database.ref('rooms/' + currentRoom + '/players/' + playerId).update({
+                            closeCalls: currentPlayerData.closeCalls + 1
+                        });
+                    }
                 } else if (distance < 15) {
                     // Proximity alert
                     displayPopup(`Proximity alert: ${otherPlayerData.name} is ${Math.round(distance)} feet away. Speed: ${Math.round(otherPlayerData.speed)} ft/s`);
                 }
             }
         });
-    });
+    }).catch(error => console.error('Error checking proximity:', error));
 }
 
 // Calculate Distance
