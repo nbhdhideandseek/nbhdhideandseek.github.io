@@ -3,45 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hide and Seek AR</title>
+    <title>AR Hide and Seek</title>
     <link rel="stylesheet" href="styles.css">
+    <!-- Firebase v8 -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <!-- A-Frame -->
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
 </head>
 <body>
-    <!-- Authentication Box -->
+    <!-- Authentication and Game UI -->
     <div id="auth-box">
-        <h1>Join or Create Room</h1>
-        <p id="room-message"></p>
         <input type="text" id="player-name" placeholder="Enter your name">
-        <div>
-            <label>
-                <input type="radio" name="role" value="hider" checked> Hider
-            </label>
-            <label>
-                <input type="radio" name="role" value="seeker"> Seeker
-            </label>
-        </div>
-        <input type="text" id="room-code" placeholder="Enter room code (if joining)">
+        <input type="radio" name="role" value="hider" checked> Hider
+        <input type="radio" name="role" value="seeker"> Seeker
+        <input type="text" id="room-code" placeholder="Enter room code (for joining)">
         <button onclick="joinRoom()">Join Room</button>
         <button onclick="createRoom()">Create Room</button>
+        <div id="room-message"></div>
     </div>
 
-    <!-- Main Game Area -->
     <div id="game-area" style="display: none;">
-        <a-scene embedded>
-            <!-- AR Content Here -->
-        </a-scene>
-        <div id="leaderboard" style="display: none;">
-            <button id="toggle-leaderboard" onclick="toggleLeaderboard()">Show Leaderboard</button>
-            <div id="leaderboard-content"></div>
-        </div>
         <button id="leave-game-button" onclick="leaveGame()" style="display: none;">Leave Game</button>
+        <button id="leaderboard-button" onclick="toggleLeaderboard()" style="display: none;">Leaderboard</button>
+        <div id="leaderboard" style="display: none;"></div>
         <div id="player-info"></div>
+        <a-scene>
+            <!-- A-Frame Scene -->
+        </a-scene>
     </div>
-
-    <!-- Include A-Frame for AR and Firebase Scripts -->
-    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.19.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.19.1/firebase-database.js"></script>
     <script src="scripts.js"></script>
 </body>
 </html>
