@@ -1,10 +1,9 @@
 body {
   margin: 0;
   font-family: Arial, sans-serif;
-}
-
-#main-menu, #game {
-  display: none;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 #main-menu {
@@ -12,7 +11,7 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100vh;
+  height: 100%;
   background-color: #f0f0f0;
 }
 
@@ -25,8 +24,8 @@ body {
 #game {
   display: none;
   position: relative;
-  height: 100vh;
-  width: 100vw;
+  height: 100%;
+  width: 100%;
   overflow: hidden;
 }
 
@@ -54,11 +53,11 @@ button {
   background-color: #008CBA;
   border: none;
   color: white;
-  padding: 15px 32px;
+  padding: 10px 20px;
   text-align: center;
   text-decoration: none;
   display: inline-block;
-  font-size: 16px;
+  font-size: 14px;
   margin: 4px 2px;
   cursor: pointer;
 }
@@ -67,7 +66,7 @@ button:hover {
   background-color: #006F8E;
 }
 
-#ui-popup {
+#ui-popup, #leaderboard {
   position: fixed;
   bottom: 20px;
   left: 50%;
@@ -80,6 +79,6 @@ button:hover {
   z-index: 20;
 }
 
-#ui-popup.show {
+#ui-popup.show, #leaderboard.show {
   display: block;
 }

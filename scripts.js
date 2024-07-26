@@ -24,6 +24,7 @@ const catchesDisplay = document.getElementById('catches');
 const closeCallsDisplay = document.getElementById('close-calls');
 const roomIdDisplay = document.getElementById('room-id');
 const uiPopup = document.getElementById('ui-popup');
+const leaderboardPopup = document.getElementById('leaderboard');
 
 // Request Permissions
 async function requestPermissions() {
@@ -193,6 +194,7 @@ function startGameLogic() {
     database.ref('rooms/' + roomId + '/players').on('value', (snapshot) => {
         const players = snapshot.val();
         updatePlayerPositions(players);
+        handleProximityAndCatches(players);
     });
 }
 
@@ -205,8 +207,6 @@ function updatePlayerPositions(players) {
     const { latitude: userLat, longitude: userLon } = userCoords;
 
     Object.keys(players).forEach((playerName) => {
-        if (playerName === username) return;
-
         const playerCoords = players[playerName];
         const { latitude, longitude, role } = playerCoords;
 
@@ -315,4 +315,14 @@ function updateCatchCount() {
 function updateCloseCallCount() {
     const count = parseInt(closeCallsDisplay.textContent.split(': ')[1], 10) + 1;
     closeCallsDisplay.textContent = `Close Calls: ${count}`;
+}
+
+function displayLeaderboard(leaderboard) {
+    leaderboardPopup.innerHTML = '<h2>Leaderboard</h2>';
+    const sortedLeaderboard = Object.entries(leaderboard).sort((a, b) => b[1].catches - a[1].catches);
+    sortedLeaderboard.forEach(([playerName, stats]) => {
+        leaderboardPopup.innerHTML += `<p>${playerName}: ${stats.catches} catches, ${stats.closeCalls} close calls</p>`;
+    });
+    leaderboardPopup.classList.add('show');
+    setTimeout(() => leaderboardPopup.classList.remove('show'), 10000);
 }
