@@ -219,3 +219,4 @@ document.getElementById('toggle-leaderboard-button').addEventListener('click', t
 // Start AR and Geolocation
 requestPermissions();
 setInterval(updateAR, 1000);
+ 
