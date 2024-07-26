@@ -20,7 +20,6 @@ var firebaseConfig = {
   let playerName = null;
   let playerRole = null;
   let userPosition = { lat: 0, lng: 0 };
-  let playerInfoDivs = {};
   let proximityAlertSent = {};
   
   const catchSound = new Audio('catch_sound.mp3');
@@ -100,7 +99,7 @@ var firebaseConfig = {
           }
   
           document.getElementById('auth-box').style.display = 'none';
-          document.getElementById('stats-box').style.display = 'block';
+          document.querySelector('a-scene').style.display = 'block';
           document.getElementById('leaderboard').style.display = 'block';
           document.getElementById('leave-game-button').style.display = 'block';
           startGeolocation();
@@ -142,7 +141,7 @@ var firebaseConfig = {
       });
   
       document.getElementById('auth-box').style.display = 'none';
-      document.getElementById('stats-box').style.display = 'block';
+      document.querySelector('a-scene').style.display = 'block';
       document.getElementById('leaderboard').style.display = 'block';
       document.getElementById('leave-game-button').style.display = 'block';
       startGeolocation();
@@ -159,7 +158,7 @@ var firebaseConfig = {
   
     database.ref('rooms/' + currentRoom + '/players/' + playerId).remove().then(() => {
       document.getElementById('auth-box').style.display = 'block';
-      document.getElementById('stats-box').style.display = 'none';
+      document.querySelector('a-scene').style.display = 'none';
       document.getElementById('leaderboard').style.display = 'none';
       document.getElementById('leave-game-button').style.display = 'none';
       document.getElementById('leaderboard-content').innerHTML = '';
@@ -169,7 +168,6 @@ var firebaseConfig = {
       playerName = null;
       playerRole = null;
       userPosition = { lat: 0, lng: 0 };
-      playerInfoDivs = {};
       proximityAlertSent = {};
     });
   }
@@ -211,22 +209,6 @@ var firebaseConfig = {
     leaderboardContent.style.display = leaderboardContent.style.display === 'none' ? 'block' : 'none';
   }
   
-  // Initialize Event Listeners
-  function initEventListeners() {
-    window.addEventListener('deviceorientation', handleOrientation);
-  }
-  
-  function handleOrientation(event) {
-    const alpha = event.alpha; // Compass direction
-    const beta = event.beta;
-    const gamma = event.gamma;
-  
-    // Update UI based on orientation
-  }
-  
-  // Start Event Listeners
-  initEventListeners();
-  
   // Watch Player Position
   database.ref('rooms/' + currentRoom + '/players').on('value', (snapshot) => {
     const players = snapshot.val();
@@ -236,46 +218,34 @@ var firebaseConfig = {
           const player = players[id];
           const distance = calculateDistance(userPosition.lat, userPosition.lng, player.lat, player.lng);
   
-          if (distance <= 1 && playerRole === 'seeker' && player.role === 'hider') {
-            // Auto-tagging within 1 foot
-            database.ref('rooms/' + currentRoom + '/players/' + id + '/role').set('seeker');
-            database.ref('rooms/' + currentRoom + '/players/' + playerId + '/catches').transaction(catches => (catches || 0) + 1);
-            catchSound.play();
-            alert(`${player.name} caught!`);
-            updateLeaderboard();
-          }
+          // Update AR elements
+          const playerInfoElement = document.getElementById('player-info');
+          if (distance <= 15) {
+            playerInfoElement.setAttribute('text', `value: ${player.name}\nDistance: ${distance.toFixed(1)} ft; color: ${player.role === 'seeker' ? 'red' : 'blue'};`);
+            playerInfoElement.setAttribute('visible', true);
   
-          if (!playerInfoDivs[id]) {
-            playerInfoDivs[id] = createPlayerInfoDiv(player);
-          }
+            if (distance <= 1 && playerRole === 'seeker' && player.role === 'hider') {
+              // Auto-tagging within 1 foot
+              database.ref('rooms/' + currentRoom + '/players/' + id + '/role').set('seeker');
+              database.ref('rooms/' + currentRoom + '/players/' + playerId + '/catches').transaction(catches => (catches || 0) + 1);
+              catchSound.play();
+              displayPopup(`${player.name} caught!`);
+              updateLeaderboard();
+            }
   
-          updatePlayerInfoDiv(playerInfoDivs[id], player, distance);
-  
-          if (distance <= 15 && !proximityAlertSent[id]) {
-            proximitySound.play();
-            alert(`Proximity alert: ${player.name} is ${distance.toFixed(1)} ft away.\nSpeed: ${(player.speed || 0).toFixed(1)} ft/s`);
-            proximityAlertSent[id] = true;
-          } else if (distance > 15) {
+            if (!proximityAlertSent[id]) {
+              proximitySound.play();
+              displayPopup(`Proximity alert: ${player.name} is ${distance.toFixed(1)} ft away.\nSpeed: ${(player.speed || 0).toFixed(1)} ft/s`);
+              proximityAlertSent[id] = true;
+            }
+          } else {
+            playerInfoElement.setAttribute('visible', false);
             proximityAlertSent[id] = false;
           }
         }
       }
     }
   });
-  
-  function createPlayerInfoDiv(player) {
-    const div = document.createElement('div');
-    div.className = 'player-info';
-    div.style.color = player.role === 'seeker' ? 'red' : 'blue';
-    document.body.appendChild(div);
-    return div;
-  }
-  
-  function updatePlayerInfoDiv(div, player, distance) {
-    div.innerHTML = `<p>${player.name}</p><p>Distance: ${distance.toFixed(1)} ft</p><p>Speed: ${(player.speed || 0).toFixed(1)} ft/s</p>`;
-    div.style.display = 'block';
-    // Update position based on orientation
-  }
   
   function calculateDistance(lat1, lng1, lat2, lng2) {
     const R = 6371e3; // metres
@@ -291,5 +261,15 @@ var firebaseConfig = {
   
     const distance = R * c * 3.28084; // Convert to feet
     return distance;
+  }
+  
+  function displayPopup(message) {
+    const popup = document.createElement('div');
+    popup.className = 'popup';
+    popup.innerText = message;
+    document.body.appendChild(popup);
+    setTimeout(() => {
+      popup.remove();
+    }, 3000);
   }
   
