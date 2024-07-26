@@ -21,6 +21,10 @@ var firebaseConfig = {
   let playerRole = null;
   let userPosition = { lat: 0, lng: 0 };
   let playerInfoDivs = {};
+  let proximityAlertSent = {};
+  
+  const catchSound = new Audio('catch_sound.mp3');
+  const proximitySound = new Audio('proximity_sound.mp3');
   
   // Update Position
   function updatePosition(position) {
@@ -36,7 +40,8 @@ var firebaseConfig = {
       speed: position.coords.speed || 0,
       direction: position.coords.heading || 0,
       role: playerRole,
-      name: playerName
+      name: playerName,
+      catches: playerRole === 'seeker' ? (playerMarkers[playerId] ? playerMarkers[playerId].catches || 0 : 0) : 0
     };
   
     database.ref('rooms/' + currentRoom + '/players/' + playerId).set(playerData);
@@ -96,11 +101,13 @@ var firebaseConfig = {
   
           document.getElementById('auth-box').style.display = 'none';
           document.getElementById('stats-box').style.display = 'block';
+          document.getElementById('leaderboard').style.display = 'block';
+          document.getElementById('leave-game-button').style.display = 'block';
           startGeolocation();
           updateLeaderboard();
         });
       } else {
-        document.getElementById('room-message').innerText = "Room not found.";
+        document.getElementById('room-message').innerText = "Room does not exist.";
       }
     }).catch(error => {
       document.getElementById('room-message').innerText = "Error: " + error.message;
@@ -136,6 +143,8 @@ var firebaseConfig = {
   
       document.getElementById('auth-box').style.display = 'none';
       document.getElementById('stats-box').style.display = 'block';
+      document.getElementById('leaderboard').style.display = 'block';
+      document.getElementById('leave-game-button').style.display = 'block';
       startGeolocation();
       alert("Room created! Share this code with your friends: " + roomCode);
       updateLeaderboard();
@@ -151,6 +160,8 @@ var firebaseConfig = {
     database.ref('rooms/' + currentRoom + '/players/' + playerId).remove().then(() => {
       document.getElementById('auth-box').style.display = 'block';
       document.getElementById('stats-box').style.display = 'none';
+      document.getElementById('leaderboard').style.display = 'none';
+      document.getElementById('leave-game-button').style.display = 'none';
       document.getElementById('leaderboard-content').innerHTML = '';
       playerMarkers = {};
       currentRoom = null;
@@ -159,6 +170,7 @@ var firebaseConfig = {
       playerRole = null;
       userPosition = { lat: 0, lng: 0 };
       playerInfoDivs = {};
+      proximityAlertSent = {};
     });
   }
   
@@ -228,6 +240,8 @@ var firebaseConfig = {
             // Auto-tagging within 1 foot
             database.ref('rooms/' + currentRoom + '/players/' + id + '/role').set('seeker');
             database.ref('rooms/' + currentRoom + '/players/' + playerId + '/catches').transaction(catches => (catches || 0) + 1);
+            catchSound.play();
+            alert(`${player.name} caught!`);
             updateLeaderboard();
           }
   
@@ -236,6 +250,14 @@ var firebaseConfig = {
           }
   
           updatePlayerInfoDiv(playerInfoDivs[id], player, distance);
+  
+          if (distance <= 15 && !proximityAlertSent[id]) {
+            proximitySound.play();
+            alert(`Proximity alert: ${player.name} is ${distance.toFixed(1)} ft away.\nSpeed: ${(player.speed || 0).toFixed(1)} ft/s`);
+            proximityAlertSent[id] = true;
+          } else if (distance > 15) {
+            proximityAlertSent[id] = false;
+          }
         }
       }
     }
