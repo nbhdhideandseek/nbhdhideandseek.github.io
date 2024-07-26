@@ -3,35 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR Hide and Seek</title>
+    <title>Hide and Seek AR</title>
     <link rel="stylesheet" href="styles.css">
-    <!-- Firebase v8 -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-    <!-- A-Frame -->
-    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
 </head>
 <body>
-    <!-- Authentication and Game UI -->
     <div id="auth-box">
-        <input type="text" id="player-name" placeholder="Enter your name">
-        <input type="radio" name="role" value="hider" checked> Hider
-        <input type="radio" name="role" value="seeker"> Seeker
-        <input type="text" id="room-code" placeholder="Enter room code (for joining)">
-        <button onclick="joinRoom()">Join Room</button>
-        <button onclick="createRoom()">Create Room</button>
+        <input type="text" id="player-name" placeholder="Enter your name" />
+        <div>
+            <label><input type="radio" name="role" value="hider" checked /> Hider</label>
+            <label><input type="radio" name="role" value="seeker" /> Seeker</label>
+        </div>
+        <button id="create-room-button">Create Room</button>
+        <button id="join-room-button">Join Room</button>
         <div id="room-message"></div>
+        <input type="text" id="room-code" placeholder="Enter room code" />
     </div>
 
     <div id="game-area" style="display: none;">
-        <button id="leave-game-button" onclick="leaveGame()" style="display: none;">Leave Game</button>
-        <button id="leaderboard-button" onclick="toggleLeaderboard()" style="display: none;">Leaderboard</button>
+        <button id="leave-game-button">Leave Game</button>
+        <button id="toggle-leaderboard-button">Leaderboard</button>
         <div id="leaderboard" style="display: none;"></div>
-        <div id="player-info"></div>
-        <a-scene>
-            <!-- A-Frame Scene -->
-        </a-scene>
+        <div id="popup-container"></div>
+        <div id="ar-overlay"></div>
     </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/aframe@1.2.0/dist/aframe.min.js"></script>
     <script src="scripts.js"></script>
 </body>
 </html>
