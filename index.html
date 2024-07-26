@@ -3,42 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR Hide and Seek</title>
+    <title>Hide and Seek AR Game</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.2.0/aframe.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/8.10.0/firebase-app.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/8.10.0/firebase-auth.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/8.10.0/firebase-database.js"></script>
+    <script src="https://aframe.io/releases/1.2.0/aframe-ar.js"></script>
 </head>
 <body>
     <div id="main-menu">
-        <h1>AR Hide and Seek</h1>
+        <h1>Hide and Seek AR Game</h1>
         <input type="text" id="username" placeholder="Enter your name">
         <div>
-            <label><input type="radio" name="role" value="hider"> Hider</label>
-            <label><input type="radio" name="role" value="seeker"> Seeker</label>
+            <input type="radio" name="role" id="hider" value="hider">
+            <label for="hider">Hider</label>
+            <input type="radio" name="role" id="seeker" value="seeker">
+            <label for="seeker">Seeker</label>
         </div>
-        <input type="text" id="room-code" placeholder="Enter room code (if joining)">
+        <input type="text" id="room-code" placeholder="Room Code">
         <button id="create-room-button">Create Room</button>
         <button id="join-room-button">Join Room</button>
     </div>
-    <div id="game" style="display: none;">
-        <a-scene embedded>
-            <a-marker preset="hiro">
-                <a-box color="red"></a-box>
-            </a-marker>
+
+    <div id="game">
+        <a-scene embedded arjs>
             <a-entity camera></a-entity>
         </a-scene>
         <div id="dock">
+            <div id="user-info">
+                <span id="user-name"></span>
+                <span id="room-id"></span>
+            </div>
+            <div id="stats">
+                <span id="catches"></span>
+                <span id="close-calls"></span>
+            </div>
             <button id="leave-game-button">Leave Game</button>
             <button id="toggle-leaderboard">Toggle Leaderboard</button>
-            <p id="user-info">Username: <span id="user-name"></span></p>
-            <p id="user-stats">Catches: <span id="catches"></span> | Close Calls: <span id="close-calls"></span></p>
-            <p id="room-info">Room Code: <span id="room-id"></span></p>
         </div>
+        <div id="ui-popup" class="popup"></div>
     </div>
-    <div id="ui-popup" class="hidden"></div>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/aframe/dist/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/aframe-ar@1.0.0/dist/aframe-ar.js"></script>
+
     <script src="scripts.js"></script>
 </body>
 </html>

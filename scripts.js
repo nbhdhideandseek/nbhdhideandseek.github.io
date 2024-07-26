@@ -28,17 +28,9 @@ const uiPopup = document.getElementById('ui-popup');
 // Request Permissions
 async function requestPermissions() {
     try {
-        const cameraPermission = await navigator.permissions.request({ name: 'camera' });
-        const geolocationPermission = await navigator.permissions.request({ name: 'geolocation' });
-        const microphonePermission = await navigator.permissions.request({ name: 'microphone' });
-        const accelerometerPermission = await navigator.permissions.request({ name: 'accelerometer' });
-
-        if (cameraPermission.state !== 'granted' ||
-            geolocationPermission.state !== 'granted' ||
-            microphonePermission.state !== 'granted' ||
-            accelerometerPermission.state !== 'granted') {
-            throw new Error('Permission not granted');
-        }
+        await navigator.mediaDevices.getUserMedia({ video: true });
+        await navigator.geolocation.getCurrentPosition(() => { });
+        // Additional sensor permissions can be requested through device-specific APIs or user prompts.
     } catch (err) {
         console.error('Error requesting permissions:', err);
         showPopup('Please grant all required permissions for the game to function properly.');
@@ -67,7 +59,7 @@ createRoomButton.addEventListener('click', async () => {
 
     // Create room logic
     try {
-        const roomId = Date.now().toString(); // Example room ID
+        const roomId = Math.random().toString(36).substring(2, 8).toUpperCase(); // Example room ID
         await database.ref('rooms/' + roomId).set({ host: username, role });
         await auth.signInAnonymously();
         localStorage.setItem('roomId', roomId);
@@ -136,8 +128,8 @@ toggleLeaderboardButton.addEventListener('click', async () => {
         const leaderboardSnapshot = await leaderboardRef.once('value');
 
         if (leaderboardSnapshot.exists()) {
-            const leaderboardData = leaderboardSnapshot.val();
-            displayLeaderboard(leaderboardData);
+            const leaderboard = leaderboardSnapshot.val();
+            displayLeaderboard(leaderboard);
         } else {
             showPopup('No leaderboard data available.');
         }
@@ -147,63 +139,180 @@ toggleLeaderboardButton.addEventListener('click', async () => {
     }
 });
 
-// Display Leaderboard
-function displayLeaderboard(data) {
-    const role = localStorage.getItem('role');
-    let leaderboardHtml = '<h2>Leaderboard</h2>';
-
-    if (role === 'seeker') {
-        // Display seekers sorted by number of catches
-        const seekers = Object.entries(data).filter(([id, stats]) => stats.role === 'seeker');
-        seekers.sort((a, b) => b[1].catches - a[1].catches);
-        leaderboardHtml += '<h3>Seekers</h3><ul>';
-        seekers.forEach(([id, stats]) => {
-            leaderboardHtml += `<li>${stats.username}: ${stats.catches} catches</li>`;
-        });
-        leaderboardHtml += '</ul>';
-    }
-
-    if (role === 'hider') {
-        // Display hiders with close calls
-        const hiders = Object.entries(data).filter(([id, stats]) => stats.role === 'hider');
-        leaderboardHtml += '<h3>Hiders</h3><ul>';
-        hiders.forEach(([id, stats]) => {
-            leaderboardHtml += `<li>${stats.username}: ${stats.closeCalls} close calls</li>`;
-        });
-        leaderboardHtml += '</ul>';
-    }
-
-    document.getElementById('ui-popup').innerHTML = leaderboardHtml;
-    document.getElementById('ui-popup').classList.add('show');
-    setTimeout(() => document.getElementById('ui-popup').classList.remove('show'), 10000);
-}
-
-// Show Game View
 function showGameView() {
     mainMenu.style.display = 'none';
     gameView.style.display = 'block';
+    updateDockInfo();
+}
 
-    const role = localStorage.getItem('role');
-    document.getElementById('dock').style.backgroundColor = role === 'seeker' ? 'red' : 'blue';
-
-    // Set user data
+function updateDockInfo() {
     const username = localStorage.getItem('username');
+    const role = localStorage.getItem('role');
     const roomId = localStorage.getItem('roomId');
 
     userNameDisplay.textContent = username;
     roomIdDisplay.textContent = roomId;
 
-    // Setup AR
-    setupAR();
+    if (role === 'seeker') {
+        document.getElementById('dock').classList.add('red');
+        document.getElementById('dock').classList.remove('blue');
+    } else {
+        document.getElementById('dock').classList.add('blue');
+        document.getElementById('dock').classList.remove('red');
+    }
+
+    // Initialize game state
+    catchesDisplay.textContent = 'Catches: 0';
+    closeCallsDisplay.textContent = 'Close Calls: 0';
+
+    // Start updating player's location and handling game logic
+    startGameLogic();
 }
 
-// Setup AR
-function setupAR() {
-    console.log('AR setup initialized');
-    // AR.js and A-Frame initialization
+function startGameLogic() {
+    const roomId = localStorage.getItem('roomId');
+    const username = localStorage.getItem('username');
+    const role = localStorage.getItem('role');
+
+    if (!roomId || !username || !role) return;
+
+    // Start listening to player's geolocation
+    navigator.geolocation.watchPosition((position) => {
+        const { latitude, longitude } = position.coords;
+        database.ref('rooms/' + roomId + '/players/' + username).set({
+            latitude,
+            longitude,
+            role
+        });
+    }, (error) => {
+        console.error('Error watching position:', error);
+        showPopup('Error watching position. Please enable location services.');
+    });
+
+    // Listen for changes in the game state
+    database.ref('rooms/' + roomId + '/players').on('value', (snapshot) => {
+        const players = snapshot.val();
+        updatePlayerPositions(players);
+    });
 }
 
-// Check Permissions on Load
-document.addEventListener('DOMContentLoaded', async () => {
-    await requestPermissions();
-});
+function updatePlayerPositions(players) {
+    const username = localStorage.getItem('username');
+    const userCoords = players[username];
+
+    if (!userCoords) return;
+
+    const { latitude: userLat, longitude: userLon } = userCoords;
+
+    Object.keys(players).forEach((playerName) => {
+        if (playerName === username) return;
+
+        const playerCoords = players[playerName];
+        const { latitude, longitude, role } = playerCoords;
+
+        const distance = calculateDistance(userLat, userLon, latitude, longitude);
+
+        // Update AR elements based on distance and role
+        updateARElements(playerName, distance, role);
+    });
+}
+
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371e3; // Earth radius in meters
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; // Distance in meters
+}
+
+function updateARElements(playerName, distance, role) {
+    const circle = document.createElement('div');
+    circle.className = 'ar-circle';
+    circle.textContent = `${playerName} (${distance.toFixed(1)}m)`;
+
+    if (role === 'seeker') {
+        circle.style.backgroundColor = 'red';
+    } else {
+        circle.style.backgroundColor = 'blue';
+    }
+
+    // Place the circle in the AR scene based on the player's relative position
+    // This can be done using A-Frame entities and setting their position
+    // according to the calculated distance and direction.
+
+    // Example:
+    // const playerEntity = document.createElement('a-entity');
+    // playerEntity.setAttribute('geometry', { primitive: 'circle', radius: 1 });
+    // playerEntity.setAttribute('material', { color: role === 'seeker' ? 'red' : 'blue' });
+    // playerEntity.setAttribute('position', calculatePositionFromDistance(distance));
+    // document.querySelector('a-scene').appendChild(playerEntity);
+}
+
+// Add additional game logic for proximity alerts, catches, and close calls here
+
+// Example of proximity alert and catch logic
+function handleProximityAndCatches(players) {
+    const username = localStorage.getItem('username');
+    const userCoords = players[username];
+    const role = localStorage.getItem('role');
+
+    if (!userCoords) return;
+
+    const { latitude: userLat, longitude: userLon } = userCoords;
+
+    Object.keys(players).forEach((playerName) => {
+        if (playerName === username) return;
+
+        const playerCoords = players[playerName];
+        const { latitude, longitude, role: playerRole } = playerCoords;
+
+        const distance = calculateDistance(userLat, userLon, latitude, longitude);
+
+        if (distance <= 15 && distance > 1) {
+            // Proximity alert
+            if (role === 'seeker' || playerRole === 'seeker') {
+                playSound('proximity');
+                showPopup(`Proximity alert with ${playerName}`);
+            }
+        } else if (distance <= 1) {
+            // Catch logic
+            if (role === 'seeker' && playerRole === 'hider') {
+                // Update Firebase
+                database.ref('rooms/' + roomId + '/players/' + playerName).update({ role: 'seeker' });
+                updateCatchCount();
+                playSound('catch');
+                showPopup(`Caught ${playerName}`);
+            }
+        } else if (distance <= 5) {
+            // Close call logic
+            if (role === 'hider' && playerRole === 'seeker') {
+                updateCloseCallCount();
+                playSound('close-call');
+                showPopup(`Close call with ${playerName}`);
+            }
+        }
+    });
+}
+
+// Functions to play sound and update stats
+function playSound(type) {
+    const audio = new Audio(`sounds/${type}.mp3`);
+    audio.play();
+}
+
+function updateCatchCount() {
+    const count = parseInt(catchesDisplay.textContent.split(': ')[1], 10) + 1;
+    catchesDisplay.textContent = `Catches: ${count}`;
+}
+
+function updateCloseCallCount() {
+    const count = parseInt(closeCallsDisplay.textContent.split(': ')[1], 10) + 1;
+    closeCallsDisplay.textContent = `Close Calls: ${count}`;
+}
