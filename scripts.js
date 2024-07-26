@@ -29,9 +29,8 @@ const leaderboardPopup = document.getElementById('leaderboard');
 // Request Permissions
 async function requestPermissions() {
     try {
-        await navigator.mediaDevices.getUserMedia({ video: true });
+        await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
         await navigator.geolocation.getCurrentPosition(() => { });
-        // Additional sensor permissions can be requested through device-specific APIs or user prompts.
     } catch (err) {
         console.error('Error requesting permissions:', err);
         showPopup('Please grant all required permissions for the game to function properly.');
@@ -55,10 +54,8 @@ createRoomButton.addEventListener('click', async () => {
         return;
     }
 
-    // Request permissions
     await requestPermissions();
 
-    // Create room logic
     try {
         const roomId = Math.random().toString(36).substring(2, 8).toUpperCase(); // Example room ID
         await database.ref('rooms/' + roomId).set({ host: username, role });
@@ -84,10 +81,8 @@ joinRoomButton.addEventListener('click', async () => {
         return;
     }
 
-    // Request permissions
     await requestPermissions();
 
-    // Join room logic
     try {
         const roomRef = database.ref('rooms/' + roomCode);
         const roomSnapshot = await roomRef.once('value');
@@ -110,33 +105,32 @@ joinRoomButton.addEventListener('click', async () => {
 
 // Leave Game
 leaveGameButton.addEventListener('click', () => {
-    // Leave game logic
-    mainMenu.style.display = 'block';
+    localStorage.removeItem('roomId');
+    localStorage.removeItem('username');
+    localStorage.removeItem('role');
     gameView.style.display = 'none';
-    localStorage.clear();
+    mainMenu.style.display = 'flex';
 });
 
 // Toggle Leaderboard
 toggleLeaderboardButton.addEventListener('click', async () => {
-    const roomId = localStorage.getItem('roomId');
-    if (!roomId) {
-        showPopup('Unable to toggle leaderboard. Please rejoin the game.');
-        return;
-    }
+    leaderboardPopup.classList.toggle('show');
+    if (leaderboardPopup.classList.contains('show')) {
+        try {
+            const roomId = localStorage.getItem('roomId');
+            const leaderboardRef = database.ref('rooms/' + roomId + '/leaderboard');
+            const leaderboardSnapshot = await leaderboardRef.once('value');
 
-    try {
-        const leaderboardRef = database.ref('rooms/' + roomId + '/leaderboard');
-        const leaderboardSnapshot = await leaderboardRef.once('value');
-
-        if (leaderboardSnapshot.exists()) {
-            const leaderboard = leaderboardSnapshot.val();
-            displayLeaderboard(leaderboard);
-        } else {
-            showPopup('No leaderboard data available.');
+            if (leaderboardSnapshot.exists()) {
+                const leaderboard = leaderboardSnapshot.val();
+                displayLeaderboard(leaderboard);
+            } else {
+                showPopup('No leaderboard data available.');
+            }
+        } catch (error) {
+            console.error('Error fetching leaderboard:', error);
+            showPopup('Error fetching leaderboard. Please try again.');
         }
-    } catch (error) {
-        console.error('Error fetching leaderboard:', error);
-        showPopup('Error fetching leaderboard. Please try again.');
     }
 });
 
@@ -162,11 +156,9 @@ function updateDockInfo() {
         document.getElementById('dock').classList.remove('red');
     }
 
-    // Initialize game state
     catchesDisplay.textContent = 'Catches: 0';
     closeCallsDisplay.textContent = 'Close Calls: 0';
 
-    // Start updating player's location and handling game logic
     startGameLogic();
 }
 
@@ -177,7 +169,6 @@ function startGameLogic() {
 
     if (!roomId || !username || !role) return;
 
-    // Start listening to player's geolocation
     navigator.geolocation.watchPosition((position) => {
         const { latitude, longitude } = position.coords;
         database.ref('rooms/' + roomId + '/players/' + username).set({
@@ -190,7 +181,6 @@ function startGameLogic() {
         showPopup('Error watching position. Please enable location services.');
     });
 
-    // Listen for changes in the game state
     database.ref('rooms/' + roomId + '/players').on('value', (snapshot) => {
         const players = snapshot.val();
         updatePlayerPositions(players);
@@ -212,7 +202,6 @@ function updatePlayerPositions(players) {
 
         const distance = calculateDistance(userLat, userLon, latitude, longitude);
 
-        // Update AR elements based on distance and role
         updateARElements(playerName, distance, role);
     });
 }
@@ -233,6 +222,9 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 }
 
 function updateARElements(playerName, distance, role) {
+    const existingCircles = document.querySelectorAll('.ar-circle');
+    existingCircles.forEach(circle => circle.remove());
+
     const circle = document.createElement('div');
     circle.className = 'ar-circle';
     circle.textContent = `${playerName} (${distance.toFixed(1)}m)`;
@@ -243,21 +235,14 @@ function updateARElements(playerName, distance, role) {
         circle.style.backgroundColor = 'blue';
     }
 
-    // Place the circle in the AR scene based on the player's relative position
-    // This can be done using A-Frame entities and setting their position
-    // according to the calculated distance and direction.
-
-    // Example:
-    // const playerEntity = document.createElement('a-entity');
-    // playerEntity.setAttribute('geometry', { primitive: 'circle', radius: 1 });
-    // playerEntity.setAttribute('material', { color: role === 'seeker' ? 'red' : 'blue' });
-    // playerEntity.setAttribute('position', calculatePositionFromDistance(distance));
-    // document.querySelector('a-scene').appendChild(playerEntity);
+    // Position the circle in the AR scene
+    const playerEntity = document.createElement('a-entity');
+    playerEntity.setAttribute('geometry', { primitive: 'circle', radius: 1 });
+    playerEntity.setAttribute('material', { color: role === 'seeker' ? 'red' : 'blue' });
+    playerEntity.setAttribute('position', { x: distance, y: 0, z: 0 });
+    document.querySelector('a-scene').appendChild(playerEntity);
 }
 
-// Add additional game logic for proximity alerts, catches, and close calls here
-
-// Example of proximity alert and catch logic
 function handleProximityAndCatches(players) {
     const username = localStorage.getItem('username');
     const userCoords = players[username];
@@ -276,22 +261,18 @@ function handleProximityAndCatches(players) {
         const distance = calculateDistance(userLat, userLon, latitude, longitude);
 
         if (distance <= 15 && distance > 1) {
-            // Proximity alert
             if (role === 'seeker' || playerRole === 'seeker') {
                 playSound('proximity');
                 showPopup(`Proximity alert with ${playerName}`);
             }
         } else if (distance <= 1) {
-            // Catch logic
             if (role === 'seeker' && playerRole === 'hider') {
-                // Update Firebase
                 database.ref('rooms/' + roomId + '/players/' + playerName).update({ role: 'seeker' });
                 updateCatchCount();
                 playSound('catch');
                 showPopup(`Caught ${playerName}`);
             }
         } else if (distance <= 5) {
-            // Close call logic
             if (role === 'hider' && playerRole === 'seeker') {
                 updateCloseCallCount();
                 playSound('close-call');
@@ -301,7 +282,6 @@ function handleProximityAndCatches(players) {
     });
 }
 
-// Functions to play sound and update stats
 function playSound(type) {
     const audio = new Audio(`sounds/${type}.mp3`);
     audio.play();
