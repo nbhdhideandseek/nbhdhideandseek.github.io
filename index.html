@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Hide and Seek</title>
+  <title>Hide and Seek AR Game</title>
   <link rel="stylesheet" type="text/css" href="styles.css">
   <!-- Firebase JS SDK (non-module version) -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
@@ -9,14 +9,25 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 </head>
 <body>
-  <div class="stats-box" id="stats-box">Point your phone to see player stats</div>
-  <div class="auth-box" id="auth-box">
+  <div id="auth-box">
     <input type="text" id="player-name" placeholder="Enter Your Name">
     <input type="text" id="room-code" placeholder="Enter Room Code">
     <button onclick="joinRoom()">Join Room</button>
     <button onclick="createRoom()">Create Room</button>
     <p id="room-message" style="color: red;"></p>
+    <label>
+      <input type="radio" name="role" value="hider" checked> Hider
+    </label>
+    <label>
+      <input type="radio" name="role" value="seeker"> Seeker
+    </label>
   </div>
+  <div class="stats-box" id="stats-box">Point your phone to see player stats</div>
+  <div id="leaderboard" class="leaderboard">
+    <button onclick="toggleLeaderboard()">Leaderboard</button>
+    <div id="leaderboard-content" class="leaderboard-content"></div>
+  </div>
+  <button id="leave-game-button" onclick="leaveGame()">Leave Game</button>
   <script src="scripts.js"></script>
 </body>
 </html>
