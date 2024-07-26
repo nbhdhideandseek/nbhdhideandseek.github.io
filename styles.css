@@ -1,82 +1,59 @@
 body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
+  margin: 0;
+  padding: 0;
+  font-family: Arial, sans-serif;
 }
 
-#auth-box, #game-area {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 10px;
+#main-menu {
+  text-align: center;
+  margin-top: 20px;
 }
 
-input[type="text"], button {
-    margin: 10px;
-    padding: 10px;
-    font-size: 16px;
+#main-menu input, #main-menu button {
+  display: block;
+  margin: 10px auto;
 }
 
-button {
-    cursor: pointer;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    padding: 15px;
-    width: 80%;
-    max-width: 300px;
+#game {
+  position: relative;
 }
 
-button:hover {
-    background-color: #0056b3;
+#dock {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding: 10px;
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-#leaderboard {
-    background-color: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 5px;
-    padding: 10px;
-    width: 80%;
-    max-width: 300px;
-    margin: 10px auto;
+#dock button {
+  color: white;
+  border: none;
+  padding: 10px;
+  cursor: pointer;
 }
 
-.player {
-    padding: 5px;
-    border-bottom: 1px solid #dee2e6;
+#dock p {
+  margin: 0;
 }
 
-.seeker {
-    color: red;
+#ui-popup {
+  position: fixed;
+  top: 20%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 20px;
+  border-radius: 10px;
+  z-index: 1000;
+  display: none;
 }
 
-.hider {
-    color: blue;
-}
-
-#popup-container {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    width: 80%;
-    max-width: 300px;
-}
-
-.popup {
-    background-color: #343a40;
-    color: white;
-    padding: 10px;
-    margin-bottom: 5px;
-    border-radius: 5px;
-}
-
-#ar-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    pointer-events: none;
+#ui-popup.show {
+  display: block;
 }
