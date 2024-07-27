@@ -16,3 +16,11 @@ p {
   font-size: 18px;
   margin: 10px 0;
 }
+
+#setup {
+  display: block;
+}
+
+#status {
+  display: none;
+}

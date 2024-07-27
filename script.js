@@ -11,7 +11,55 @@ var firebaseConfig = {
 
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
 const database = firebase.database();
+
+let userId = null;
+
+// Function to initialize Firebase Anonymous Authentication
+function initialize() {
+    const username = document.getElementById('username').value.trim();
+    if (username === "") {
+        alert("Please enter a username.");
+        return;
+    }
+    
+    // Sign in anonymously
+    auth.signInAnonymously().then(() => {
+        userId = auth.currentUser.uid;
+        document.getElementById('setup').style.display = 'none';
+        document.getElementById('status').style.display = 'block';
+        document.getElementById('status-text').textContent = 'Status: Tracking...';
+        
+        // Store username in Firebase
+        database.ref('users/' + userId).set({ username: username });
+        
+        // Start updating location
+        updateLocation();
+        
+        // Start distance calculation
+        setInterval(updateDistance, 2000);
+    }).catch(error => {
+        console.error("Error signing in anonymously:", error);
+    });
+}
+
+// Function to calculate distance between two coordinates using Haversine formula
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371e3; // Radius of the Earth in meters
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    const distance = R * c; // in meters
+    return distance;
+}
 
 // Function to update user's location and send to Firebase
 function updateLocation() {
@@ -23,11 +71,12 @@ function updateLocation() {
             };
             
             // Store user's location in Firebase
-            const userId = "user1"; // Change this based on your setup
-            database.ref('locations/' + userId).set(userLocation)
-                .catch(error => {
-                    console.error("Error writing location data:", error);
-                });
+            if (userId) {
+                database.ref('locations/' + userId).set(userLocation)
+                    .catch(error => {
+                        console.error("Error writing location data:", error);
+                    });
+            }
         }, error => {
             console.error("Error getting location:", error);
         }, {
@@ -36,36 +85,53 @@ function updateLocation() {
             timeout: 5000
         });
     } else {
-        document.getElementById('status').textContent = 'Geolocation is not supported by this browser.';
+        document.getElementById('status-text').textContent = 'Geolocation is not supported by this browser.';
     }
 }
 
 // Function to calculate and display distance
 function updateDistance() {
-    const userId1 = "user1"; // Change this based on your setup
-    const userId2 = "user2"; // Change this based on your setup
-
-    database.ref('locations/' + userId1).once('value').then(snapshot1 => {
-        const location1 = snapshot1.val();
-        database.ref('locations/' + userId2).once('value').then(snapshot2 => {
-            const location2 = snapshot2.val();
-            if (location1 && location2) {
-                const distance = calculateDistance(
-                    location1.latitude,
-                    location1.longitude,
-                    location2.latitude,
-                    location2.longitude
-                );
-                document.getElementById('distance').textContent = `Distance: ${distance.toFixed(2)} meters (${(distance * 3.28084).toFixed(2)} feet)`;
+    if (!userId) return;
+    
+    database.ref('locations').once('value').then(snapshot => {
+        const locations = snapshot.val();
+        if (locations) {
+            const userLocations = Object.entries(locations).filter(([key]) => key !== userId);
+            if (userLocations.length > 0) {
+                const [otherUserId, otherLocation] = userLocations[0];
+                const userLocationRef = database.ref('locations/' + userId);
+                userLocationRef.once('value').then(userLocationSnapshot => {
+                    const userLocation = userLocationSnapshot.val();
+                    if (userLocation) {
+                        const distance = calculateDistance(
+                            userLocation.latitude,
+                            userLocation.longitude,
+                            otherLocation.latitude,
+                            otherLocation.longitude
+                        );
+                        document.getElementById('distance').textContent = `Distance: ${distance.toFixed(2)} meters (${(distance * 3.28084).toFixed(2)} feet)`;
+                    }
+                }).catch(error => {
+                    console.error("Error reading user location:", error);
+                });
             }
-        }).catch(error => {
-            console.error("Error reading location data:", error);
-        });
+        }
     }).catch(error => {
-        console.error("Error reading location data:", error);
+        console.error("Error reading locations:", error);
     });
 }
 
-// Start tracking location and update distance every 2 seconds
-updateLocation();
-setInterval(updateDistance, 2000);
+// Request all necessary permissions
+function requestPermissions() {
+    if (navigator.permissions) {
+        navigator.permissions.query({ name: 'geolocation' }).then(permissionStatus => {
+            if (permissionStatus.state !== 'granted') {
+                console.warn('Geolocation permission not granted.');
+            }
+        }).catch(error => {
+            console.error("Error requesting permissions:", error);
+        });
+    }
+}
+
+requestPermissions();

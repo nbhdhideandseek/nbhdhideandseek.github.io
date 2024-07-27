@@ -9,10 +9,18 @@
 <body>
     <div class="container">
         <h1>Distance Measurement</h1>
-        <p id="status">Status: Not tracking</p>
-        <p id="distance">Distance: N/A</p>
+        <div id="setup">
+            <p>Enter your username:</p>
+            <input type="text" id="username" placeholder="Username">
+            <button onclick="initialize()">Start Tracking</button>
+        </div>
+        <div id="status">
+            <p id="status-text">Status: Not tracking</p>
+            <p id="distance">Distance: N/A</p>
+        </div>
     </div>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <script src="script.js"></script>
 </body>
