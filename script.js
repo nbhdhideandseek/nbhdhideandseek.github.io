@@ -17,6 +17,8 @@ const database = firebase.database();
 let userId = null;
 let userName = null;
 let lastUpdated = {};
+let userNames = {}; // Track user names to avoid duplicates
+let activeDivs = {}; // Track active user divs to avoid duplicates
 
 // Function to initialize Firebase Anonymous Authentication
 function initialize() {
@@ -25,25 +27,35 @@ function initialize() {
         alert("Please enter a username.");
         return;
     }
-    
-    // Sign in anonymously
-    auth.signInAnonymously().then(() => {
-        userId = auth.currentUser.uid;
-        userName = username;
-        document.getElementById('setup').style.display = 'none';
-        document.getElementById('status').style.display = 'block';
-        document.getElementById('status-text').textContent = 'Status: Tracking...';
-        
-        // Store username in Firebase
-        database.ref('users/' + userId).set({ username: username });
-        
-        // Start updating location
-        updateLocation();
-        
-        // Set up real-time listeners
-        setupRealTimeListeners();
-    }).catch(error => {
-        console.error("Error signing in anonymously:", error);
+
+    // Check for unique username
+    database.ref('usernames').once('value').then(snapshot => {
+        const usernames = snapshot.val() || {};
+        if (Object.values(usernames).includes(username)) {
+            alert("Username is already taken. Please choose another.");
+            return;
+        }
+
+        // Sign in anonymously
+        auth.signInAnonymously().then(() => {
+            userId = auth.currentUser.uid;
+            userName = username;
+            document.getElementById('setup').style.display = 'none';
+            document.getElementById('status').style.display = 'block';
+            document.getElementById('status-text').textContent = 'Status: Tracking...';
+
+            // Store username in Firebase
+            database.ref('users/' + userId).set({ username: username });
+            database.ref('usernames/' + userId).set(username);
+            
+            // Start updating location
+            updateLocation();
+            
+            // Set up real-time listeners
+            setupRealTimeListeners();
+        }).catch(error => {
+            console.error("Error signing in anonymously:", error);
+        });
     });
 }
 
@@ -100,9 +112,6 @@ function setupRealTimeListeners() {
     database.ref('locations').on('value', snapshot => {
         const locations = snapshot.val();
         if (locations) {
-            const usersList = document.getElementById('users-list');
-            usersList.innerHTML = ''; // Clear existing users
-
             Object.entries(locations).forEach(([otherUserId, otherLocation]) => {
                 if (otherUserId !== userId) {
                     const distance = calculateDistance(
@@ -112,18 +121,32 @@ function setupRealTimeListeners() {
                         otherLocation.longitude
                     );
 
-                    // Create and append user div
-                    const userDiv = document.createElement('div');
-                    userDiv.className = 'user-div';
-                    userDiv.id = 'user-' + otherUserId;
+                    // Create or update user div
+                    if (!activeDivs[otherUserId]) {
+                        // Create new div if not exists
+                        const userDiv = document.createElement('div');
+                        userDiv.className = 'user-div';
+                        userDiv.id = 'user-' + otherUserId;
 
-                    const userName = locations[otherUserId]?.username || 'Unknown';
-                    userDiv.innerHTML = `
-                        <p class="user-name">${userName}</p>
-                        <p class="user-distance">Distance: ${(distance * 3.28084).toFixed(2)} feet</p>
-                    `;
-
-                    usersList.appendChild(userDiv);
+                        // Get the user's name from Firebase
+                        database.ref('users/' + otherUserId + '/username').once('value').then(nameSnapshot => {
+                            const otherUserName = nameSnapshot.val() || 'Unknown';
+                            userNames[otherUserId] = otherUserName;
+                            
+                            userDiv.innerHTML = `
+                                <p class="user-name">${userNames[otherUserId]}</p>
+                                <p class="user-distance">Distance: ${(distance * 3.28084).toFixed(2)} feet</p>
+                            `;
+                            document.getElementById('users-list').appendChild(userDiv);
+                            activeDivs[otherUserId] = userDiv;
+                        }).catch(error => {
+                            console.error("Error fetching username:", error);
+                        });
+                    } else {
+                        // Update existing div
+                        const userDiv = activeDivs[otherUserId];
+                        userDiv.querySelector('.user-distance').textContent = `Distance: ${(distance * 3.28084).toFixed(2)} feet`;
+                    }
 
                     // Update last updated timestamp
                     lastUpdated[otherUserId] = Date.now();
@@ -146,10 +169,15 @@ function removeInactiveUsers() {
 
     Object.entries(lastUpdated).forEach(([userId, lastUpdateTime]) => {
         if (now - lastUpdateTime > 10000) { // 10 seconds
-            const userDiv = document.getElementById('user-' + userId);
+            const userDiv = activeDivs[userId];
             if (userDiv) {
                 usersList.removeChild(userDiv);
+                delete activeDivs[userId];
                 delete lastUpdated[userId];
+                delete userNames[userId];
+                database.ref('locations/' + userId).remove(); // Clean up Firebase data
+                database.ref('users/' + userId).remove();
+                database.ref('usernames/' + userId).remove();
             }
         }
     });
