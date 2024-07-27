@@ -67,7 +67,8 @@ function updateLocation() {
         navigator.geolocation.watchPosition(position => {
             const userLocation = {
                 latitude: position.coords.latitude,
-                longitude: position.coords.longitude
+                longitude: position.coords.longitude,
+                timestamp: position.timestamp // Add timestamp for synchronization
             };
             
             // Store user's location in Firebase
