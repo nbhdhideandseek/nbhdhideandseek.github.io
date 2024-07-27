@@ -15,6 +15,8 @@ const auth = firebase.auth();
 const database = firebase.database();
 
 let userId = null;
+let userName = null;
+let lastUpdated = {};
 
 // Function to initialize Firebase Anonymous Authentication
 function initialize() {
@@ -27,6 +29,7 @@ function initialize() {
     // Sign in anonymously
     auth.signInAnonymously().then(() => {
         userId = auth.currentUser.uid;
+        userName = username;
         document.getElementById('setup').style.display = 'none';
         document.getElementById('status').style.display = 'block';
         document.getElementById('status-text').textContent = 'Status: Tracking...';
@@ -37,8 +40,8 @@ function initialize() {
         // Start updating location
         updateLocation();
         
-        // Start distance calculation
-        setInterval(updateDistance, 2000);
+        // Set up real-time listeners
+        setupRealTimeListeners();
     }).catch(error => {
         console.error("Error signing in anonymously:", error);
     });
@@ -77,6 +80,7 @@ function updateLocation() {
                     .catch(error => {
                         console.error("Error writing location data:", error);
                     });
+                lastUpdated[userId] = Date.now(); // Update last timestamp
             }
         }, error => {
             console.error("Error getting location:", error);
@@ -90,35 +94,64 @@ function updateLocation() {
     }
 }
 
-// Function to calculate and display distance
-function updateDistance() {
-    if (!userId) return;
-    
-    database.ref('locations').once('value').then(snapshot => {
+// Function to update distances and manage user divs
+function setupRealTimeListeners() {
+    // Listen for changes in users
+    database.ref('locations').on('value', snapshot => {
         const locations = snapshot.val();
         if (locations) {
-            const userLocations = Object.entries(locations).filter(([key]) => key !== userId);
-            if (userLocations.length > 0) {
-                const [otherUserId, otherLocation] = userLocations[0];
-                const userLocationRef = database.ref('locations/' + userId);
-                userLocationRef.once('value').then(userLocationSnapshot => {
-                    const userLocation = userLocationSnapshot.val();
-                    if (userLocation) {
-                        const distance = calculateDistance(
-                            userLocation.latitude,
-                            userLocation.longitude,
-                            otherLocation.latitude,
-                            otherLocation.longitude
-                        );
-                        document.getElementById('distance').textContent = `Distance: ${distance.toFixed(2)} meters (${(distance * 3.28084).toFixed(2)} feet)`;
-                    }
-                }).catch(error => {
-                    console.error("Error reading user location:", error);
-                });
+            const usersList = document.getElementById('users-list');
+            usersList.innerHTML = ''; // Clear existing users
+
+            Object.entries(locations).forEach(([otherUserId, otherLocation]) => {
+                if (otherUserId !== userId) {
+                    const distance = calculateDistance(
+                        locations[userId].latitude,
+                        locations[userId].longitude,
+                        otherLocation.latitude,
+                        otherLocation.longitude
+                    );
+
+                    // Create and append user div
+                    const userDiv = document.createElement('div');
+                    userDiv.className = 'user-div';
+                    userDiv.id = 'user-' + otherUserId;
+
+                    const userName = locations[otherUserId]?.username || 'Unknown';
+                    userDiv.innerHTML = `
+                        <p class="user-name">${userName}</p>
+                        <p class="user-distance">Distance: ${(distance * 3.28084).toFixed(2)} feet</p>
+                    `;
+
+                    usersList.appendChild(userDiv);
+
+                    // Update last updated timestamp
+                    lastUpdated[otherUserId] = Date.now();
+                }
+            });
+
+            // Remove inactive users
+            removeInactiveUsers();
+        }
+    });
+
+    // Clean up inactive users every 10 seconds
+    setInterval(removeInactiveUsers, 10000);
+}
+
+// Function to remove inactive user divs
+function removeInactiveUsers() {
+    const now = Date.now();
+    const usersList = document.getElementById('users-list');
+
+    Object.entries(lastUpdated).forEach(([userId, lastUpdateTime]) => {
+        if (now - lastUpdateTime > 10000) { // 10 seconds
+            const userDiv = document.getElementById('user-' + userId);
+            if (userDiv) {
+                usersList.removeChild(userDiv);
+                delete lastUpdated[userId];
             }
         }
-    }).catch(error => {
-        console.error("Error reading locations:", error);
     });
 }
 
